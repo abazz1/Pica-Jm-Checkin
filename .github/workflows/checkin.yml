@@ -15,7 +15,7 @@ on:
 env:
   TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
   TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-  TG_MESSAGE_ID: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tg_message_id || '' }}
+  TG_MESSAGE_ID: ${{ github.event.inputs.tg_message_id }}
 
 jobs:
   checkin:
