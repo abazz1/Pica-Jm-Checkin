@@ -282,9 +282,26 @@ class PicacgCheckIn:
         return result
 
 
+def notify_tg(message):
+    bot_token = os.environ.get("TG_BOT_TOKEN", "")
+    chat_id = os.environ.get("TG_CHAT_ID", "")
+    if not bot_token or not chat_id:
+        return
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
     today = datetime.now().strftime("%Y-%m-%d")
     print(f"===== Daily Check-In | {today} =====\n")
+
+    results = []
 
     # JM Check-In
     jm_user = os.environ.get("JM_USERNAME", "")
@@ -292,11 +309,15 @@ if __name__ == "__main__":
     if jm_user and jm_pass:
         try:
             checker = JMCheckIn(jm_user, jm_pass)
-            checker.run()
+            msg = checker.run()
+            results.append(f"JM: {msg}")
         except Exception as e:
-            print(f"[ERROR] JM check-in failed: {e}")
+            err = f"JM failed: {e}"
+            print(f"[ERROR] {err}")
+            results.append(err)
     else:
         print("[SKIP] JM_USERNAME/JM_PASSWORD not set")
+        results.append("JM: skipped")
 
     print()
 
@@ -307,10 +328,16 @@ if __name__ == "__main__":
     if pc_user and pc_pass:
         try:
             checker = PicacgCheckIn(pc_user, pc_pass, pc_url)
-            checker.run()
+            msg = checker.run()
+            results.append(f"Picacg: {msg}")
         except Exception as e:
-            print(f"[ERROR] Picacg punch-in failed: {e}")
+            err = f"Picacg failed: {e}"
+            print(f"[ERROR] {err}")
+            results.append(err)
     else:
         print("[SKIP] PICACG_USERNAME/PICACG_PASSWORD not set")
+        results.append("Picacg: skipped")
 
     print(f"\n===== Done =====")
+
+    notify_tg(f"<b>Daily Check-In | {today}</b>\n" + "\n".join(results))
