@@ -1,14 +1,20 @@
 name: Daily Check-In
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
-      tg_chat_id:
-        description: 'Telegram Chat ID for progress updates'
       tg_message_id:
         description: 'Telegram Message ID to edit'
+
+env:
+  TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+  TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
 
 jobs:
   checkin:
@@ -16,13 +22,38 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: ⏳ 初始化
+        run: |
+          MSG_ID="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tg_message_id || '' }}"
+          echo "TG_MESSAGE_ID=$MSG_ID" >> $GITHUB_ENV
+
+      - name: ⏳ 计算总步数
+        id: calc
+        run: |
+          INFRA=3; JM=0; PIC=0
+          [ -n "${{ secrets.JM_USERNAME }}" ] && JM=3
+          [ -n "${{ secrets.PICACG_USERNAME }}" ] && PIC=2
+          TOTAL=$((INFRA + JM + PIC + 1))
+          echo "TG_TOTAL=$TOTAL" >> $GITHUB_ENV
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
       - name: 检出代码
         uses: actions/checkout@v4
+
+      - name: ⏳ 检出代码
+        run: |
+          echo "TG_CURRENT=1" >> $GITHUB_ENV
+          python3 tg_progress.py 1 "$TG_TOTAL" '检出代码 ✅'
 
       - name: 配置 Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: ⏳ 配置 Python
+        run: |
+          echo "TG_CURRENT=2" >> $GITHUB_ENV
+          python3 tg_progress.py 2 "$TG_TOTAL" '配置 Python ✅'
 
       - name: 随机延迟 (仅定时触发)
         if: github.event_name == 'schedule'
@@ -30,10 +61,13 @@ jobs:
 
       - name: 安装依赖
         run: |
-          echo "Installing requests and pycryptodome..."
           pip install --upgrade pip -q
           pip install -r requirements.txt -q
-          echo "Dependencies installed"
+
+      - name: ⏳ 安装依赖
+        run: |
+          echo "TG_CURRENT=3" >> $GITHUB_ENV
+          python3 tg_progress.py 3 "$TG_TOTAL" '安装依赖 ✅'
 
       - name: 执行签到
         env:
@@ -42,8 +76,7 @@ jobs:
           PICACG_USERNAME: ${{ secrets.PICACG_USERNAME }}
           PICACG_PASSWORD: ${{ secrets.PICACG_PASSWORD }}
           PICACG_BASE_URL: ${{ secrets.PICACG_BASE_URL }}
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ inputs.tg_chat_id || secrets.TG_CHAT_ID }}
-          TG_MESSAGE_ID: ${{ inputs.tg_message_id || '' }}
+          TG_TOTAL: ${{ steps.calc.outputs.total }}
+          TG_CURRENT: 3
         run: |
           python checkin.py

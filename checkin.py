@@ -12,9 +12,9 @@ from datetime import datetime
 
 
 class Progress:
-    def __init__(self, total, title='', tg_fn=None):
+    def __init__(self, total, title='', tg_fn=None, start=0):
         self.total = total
-        self.current = 0
+        self.current = start
         self.tg_fn = tg_fn
         if title:
             print(f'📋 {title}')
@@ -413,23 +413,24 @@ if __name__ == "__main__":
     today = datetime.now().strftime("%Y-%m-%d")
     print(f"===== 每日签到 | {today} =====\n")
 
-    total_steps = 0
+    total_steps = int(os.environ.get("TG_TOTAL", "0"))
+    current_step = int(os.environ.get("TG_CURRENT", "0"))
+
     jm_user = os.environ.get("JM_USERNAME", "")
     jm_pass = os.environ.get("JM_PASSWORD", "")
     pc_user = os.environ.get("PICACG_USERNAME", "")
     pc_pass = os.environ.get("PICACG_PASSWORD", "")
     pc_url = os.environ.get("PICACG_BASE_URL", "https://picaapi.go2778.com")
 
-    if jm_user and jm_pass: total_steps += 3
-    if pc_user and pc_pass: total_steps += 2
-    total_steps += 1
+    if total_steps == 0:
+        if jm_user and jm_pass: total_steps += 3
+        if pc_user and pc_pass: total_steps += 2
+        total_steps += 1
 
-    p = Progress(total_steps, '签到流程', tg_fn=tg_progress)
+    p = Progress(total_steps, '签到流程', tg_fn=tg_progress, start=current_step)
 
     results = []
-    step = 0
 
-    # JM Check-In
     if jm_user and jm_pass:
         try:
             checker = JMCheckIn(jm_user, jm_pass, progress=p)
@@ -443,7 +444,6 @@ if __name__ == "__main__":
         print("[SKIP] JM_USERNAME/JM_PASSWORD not set")
         results.append("JM: skipped")
 
-    # Picacg Punch-In
     if pc_user and pc_pass:
         try:
             checker = PicacgCheckIn(pc_user, pc_pass, pc_url, progress=p)
