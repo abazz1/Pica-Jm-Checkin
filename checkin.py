@@ -9,6 +9,12 @@ import requests
 from Crypto.Cipher import AES
 from datetime import datetime
 
+_TC = "經獲幣獎勵連續錄簽過關體認證碼驗動態權確頁稱帳號郵件時間點對爲與個們說話題會發現見來還這麼嗎請問答回覆製圖發關懷準備機當瞭隻從業報麵條匯盡畫書僅廣義標誌導覽瀏覽選項單擊裏"
+_SC = "经获币奖励连续录签过关体认证码验动态权确页称号邮件时间点对为与个们说话题会发现见来还这么吗请问答回复制图发关怀准备机当了只从业报面条汇尽画书仅广义标标志导览浏览选项单击里"
+
+def sc(text):
+    return text.translate(str.maketrans(_TC, _SC))
+
 
 class JMCheckIn:
     jm_version = "2.0.16"
@@ -187,15 +193,25 @@ class JMCheckIn:
         }))
         if "msg" not in result:
             raise Exception(f"Invalid check-in result: {result}")
-        return result["msg"]
+        return result
 
     def run(self):
         today = datetime.now().strftime("%Y-%m-%d")
         print(f"=== JM Check-In | {today} ===")
         uid = self.login()
-        msg = self.daily_check_in(uid)
-        print(f"[OK] Check-in result: {msg}")
-        return msg
+        result = self.daily_check_in(uid)
+        msg = result["msg"]
+        msg_sc = sc(msg)
+
+        extra = []
+        for k in ("exp", "coin", "days", "gold", "silver"):
+            if k in result:
+                extra.append(f"{k}={result[k]}")
+        reward = f" ({', '.join(extra)})" if extra else ""
+
+        line = f"{msg_sc}{reward}"
+        print(f"[OK] Check-in result: {line}")
+        return line
 
 
 class PicacgCheckIn:
@@ -255,33 +271,48 @@ class PicacgCheckIn:
         print(f"[OK] Picacg login success")
         return self.token
 
-    def is_punched(self):
+    def profile(self):
         _, data = self._req("GET", "/users/profile")
-        return data.get("data", {}).get("user", {}).get("isPunched", False)
+        return data.get("data", {}).get("user", {})
+
+    def is_punched(self):
+        return self.profile().get("isPunched", False)
 
     def punch(self):
-        if self.is_punched():
+        before = self.profile()
+        exp_before = before.get("exp", 0)
+        level_before = before.get("level", 0)
+
+        if before.get("isPunched"):
             print("[*] Already punched in today, skipping")
             return "already_punched"
+
         for attempt in range(2):
             print(f"[*] Submitting Picacg punch-in (attempt {attempt + 1})...")
             _, data = self._req("POST", "/users/punch-in", {})
             res = data.get("data", {}).get("res", {})
             status = res.get("status")
             if status == "ok":
-                print(f"[OK] Punch-in success: {res.get('punchInLastDay')}")
-                return "ok"
+                after = self.profile()
+                exp_gain = after.get("exp", 0) - exp_before
+                parts = [f"punchInLastDay={res.get('punchInLastDay')}"]
+                if exp_gain > 0:
+                    parts.append(f"exp+{exp_gain}")
+                if after.get("level", 0) > level_before:
+                    parts.append(f"level up! ({level_before}→{after['level']})")
+                line = "ok (" + ", ".join(parts) + ")"
+                print(f"[OK] Punch-in result: {line}")
+                return line
             if attempt == 0:
                 print(f"[WARN] Punch-in failed, retrying...")
         print(f"[WARN] Punch-in result: {res}")
-        return status
+        return f"fail ({res.get('status')})"
 
     def run(self):
         today = datetime.now().strftime("%Y-%m-%d")
         print(f"=== Picacg Punch-In | {today} ===")
         self.login()
         result = self.punch()
-        print(f"[OK] Punch-in result: {result}")
         return result
 
 
