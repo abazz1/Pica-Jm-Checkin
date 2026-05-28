@@ -1,4 +1,4 @@
-name: JM Daily Check-In
+name: Daily Check-In
 
 on:
   schedule:
@@ -28,5 +28,8 @@ jobs:
         env:
           JM_USERNAME: ${{ secrets.JM_USERNAME }}
           JM_PASSWORD: ${{ secrets.JM_PASSWORD }}
+          PICACG_USERNAME: ${{ secrets.PICACG_USERNAME }}
+          PICACG_PASSWORD: ${{ secrets.PICACG_PASSWORD }}
+          PICACG_BASE_URL: ${{ secrets.PICACG_BASE_URL }}
         run: |
           python checkin.py

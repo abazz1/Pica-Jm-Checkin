@@ -1,7 +1,9 @@
 import os
 import time
 import hashlib
+import hmac
 import json
+import uuid
 import base64
 import requests
 from Crypto.Cipher import AES
@@ -196,12 +198,119 @@ class JMCheckIn:
         return msg
 
 
-if __name__ == "__main__":
-    username = os.environ.get("JM_USERNAME", "")
-    password = os.environ.get("JM_PASSWORD", "")
-    if not username or not password:
-        print("[ERROR] JM_USERNAME and JM_PASSWORD environment variables are required")
-        exit(1)
+class PicacgCheckIn:
+    API_KEY = "C69BAF41DA5ABD1FFEDC6D2FEA56B"
+    HMAC_KEY = b'~d}$Q7$eIni=V)9\\RK/P.RM4;9[7|@/CA}b~OW!3?EV`:<>M7pddUBL5n|0/*Cn'
 
-    checker = JMCheckIn(username, password)
-    checker.run()
+    def __init__(self, username, password, base_url="https://picaapi.go2778.com"):
+        self.username = username
+        self.password = password
+        self.base_url = base_url
+        self.token = None
+
+    def _sign(self, method, path, ts, nonce):
+        raw = (path.lstrip('/') + ts + nonce + method.upper() + self.API_KEY).lower()
+        return hmac.new(self.HMAC_KEY, raw.encode(), hashlib.sha256).hexdigest()
+
+    def _headers(self, method, path, ts, nonce):
+        return {
+            "api-key": self.API_KEY,
+            "accept": "application/vnd.picacomic.com.v1+json",
+            "app-channel": "3",
+            "authorization": self.token or "",
+            "time": ts,
+            "nonce": nonce,
+            "app-version": "2.2.1.3.3.4",
+            "app-uuid": "defaultUuid",
+            "image-quality": "original",
+            "app-platform": "android",
+            "app-build-version": "45",
+            "Content-Type": "application/json; charset=UTF-8",
+            "user-agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36",
+            "version": "v1.4.1",
+            "Host": self.base_url.replace("https://", ""),
+            "signature": self._sign(method, path, ts, nonce),
+            "Accept-Encoding": "gzip, deflate",
+        }
+
+    def _req(self, method, path, body=None):
+        nonce = uuid.uuid4().hex.replace('-', '')
+        ts = str(int(time.time()))
+        r = requests.request(
+            method.upper(), f"{self.base_url}{path}",
+            headers=self._headers(method, path, ts, nonce),
+            json=body, timeout=20,
+        )
+        return r.status_code, r.json()
+
+    def login(self):
+        print("[*] Logging in to Picacg...")
+        status, data = self._req("POST", "/auth/sign-in", {
+            "email": self.username,
+            "password": self.password,
+        })
+        if status != 200 or data.get("code") != 200:
+            raise Exception(f"Login failed: {data}")
+        self.token = data["data"]["token"]
+        print(f"[OK] Picacg login success")
+        return self.token
+
+    def is_punched(self):
+        _, data = self._req("GET", "/users/profile")
+        return data.get("data", {}).get("user", {}).get("isPunched", False)
+
+    def punch(self):
+        if self.is_punched():
+            print("[*] Already punched in today, skipping")
+            return "already_punched"
+        print("[*] Submitting Picacg punch-in...")
+        _, data = self._req("POST", "/users/punch-in", {})
+        res = data.get("data", {}).get("res", {})
+        status = res.get("status")
+        if status == "ok":
+            print(f"[OK] Punch-in success: {res.get('punchInLastDay')}")
+            return "ok"
+        print(f"[WARN] Punch-in result: {res}")
+        return status
+
+    def run(self):
+        today = datetime.now().strftime("%Y-%m-%d")
+        print(f"=== Picacg Punch-In | {today} ===")
+        self.login()
+        result = self.punch()
+        print(f"[OK] Punch-in result: {result}")
+        return result
+
+
+if __name__ == "__main__":
+    today = datetime.now().strftime("%Y-%m-%d")
+    print(f"===== Daily Check-In | {today} =====\n")
+
+    # JM Check-In
+    jm_user = os.environ.get("JM_USERNAME", "")
+    jm_pass = os.environ.get("JM_PASSWORD", "")
+    if jm_user and jm_pass:
+        try:
+            checker = JMCheckIn(jm_user, jm_pass)
+            checker.run()
+        except Exception as e:
+            print(f"[ERROR] JM check-in failed: {e}")
+    else:
+        print("[SKIP] JM_USERNAME/JM_PASSWORD not set")
+
+    print()
+
+    # Picacg Punch-In
+    pc_user = os.environ.get("PICACG_USERNAME", "")
+    pc_pass = os.environ.get("PICACG_PASSWORD", "")
+    pc_url = os.environ.get("PICACG_BASE_URL", "https://picaapi.go2778.com")
+    if pc_user and pc_pass:
+        try:
+            checker = PicacgCheckIn(pc_user, pc_pass, pc_url)
+            checker.run()
+        except Exception as e:
+            print(f"[ERROR] Picacg punch-in failed: {e}")
+    else:
+        print("[SKIP] PICACG_USERNAME/PICACG_PASSWORD not set")
+
+    print(f"\n===== Done =====")
