@@ -2,7 +2,7 @@ name: Daily Check-In
 
 concurrency:
   group: ${{ github.workflow }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 on:
   schedule:
@@ -57,7 +57,13 @@ jobs:
 
       - name: 随机延迟 (仅定时触发)
         if: github.event_name == 'schedule'
-        run: sleep $(( RANDOM % 3600 ))
+        run: |
+          DELAY=$(( RANDOM % 3600 ))
+          for ((i=0; i<DELAY; i+=5)); do
+            python3 tg_progress.py 2 "$TG_TOTAL" "随机延迟 ${i}s / ${DELAY}s" 2>/dev/null || true
+            REMAIN=$((DELAY - i))
+            [ $REMAIN -lt 5 ] && sleep $REMAIN || sleep 5
+          done
 
       - name: 安装依赖
         run: |

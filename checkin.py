@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import random
 import hashlib
 import hmac
 import json
@@ -285,6 +286,7 @@ class PicacgCheckIn:
         }
 
     def _req(self, method, path, body=None):
+        time.sleep(random.uniform(0.3, 1.0))
         nonce = uuid.uuid4().hex.replace('-', '')
         ts = str(int(time.time()))
         r = requests.request(
