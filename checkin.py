@@ -300,20 +300,23 @@ class PicacgCheckIn:
                     parts.append(f"exp+{exp_gain}")
                 if after.get("level", 0) > level_before:
                     parts.append(f"level up! ({level_before}→{after['level']})")
-                line = "ok (" + ", ".join(parts) + ")"
+                line = "签到成功 (" + ", ".join(parts) + ")"
                 print(f"[OK] Punch-in result: {line}")
                 return line
             if attempt == 0:
                 print(f"[WARN] Punch-in failed, retrying...")
         print(f"[WARN] Punch-in result: {res}")
-        return f"fail ({res.get('status')})"
+        return f"签到失败 ({res.get('status')})"
 
     def run(self):
         today = datetime.now().strftime("%Y-%m-%d")
         print(f"=== Picacg Punch-In | {today} ===")
         self.login()
         result = self.punch()
-        return result
+        label = {
+            "already_punched": "今日已签到，跳过",
+        }.get(result, result)
+        return label
 
 
 def notify_tg(message):
@@ -333,7 +336,7 @@ def notify_tg(message):
 
 if __name__ == "__main__":
     today = datetime.now().strftime("%Y-%m-%d")
-    print(f"===== Daily Check-In | {today} =====\n")
+    print(f"===== 每日签到 | {today} =====\n")
 
     results = []
 
@@ -374,4 +377,4 @@ if __name__ == "__main__":
 
     print(f"\n===== Done =====")
 
-    notify_tg(f"<b>Daily Check-In | {today}</b>\n" + "\n".join(results))
+    notify_tg(f"<b>每日签到 | {today}</b>\n" + "\n".join(results))
