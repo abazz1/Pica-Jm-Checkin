@@ -15,6 +15,7 @@ on:
 env:
   TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
   TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+  TG_MESSAGE_ID: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tg_message_id || '' }}
 
 jobs:
   checkin:
@@ -22,11 +23,6 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: ⏳ 初始化
-        run: |
-          MSG_ID="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tg_message_id || '' }}"
-          echo "TG_MESSAGE_ID=$MSG_ID" >> $GITHUB_ENV
-
       - name: ⏳ 计算总步数
         id: calc
         run: |
