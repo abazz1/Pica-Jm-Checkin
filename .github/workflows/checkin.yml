@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
+    inputs:
+      tg_chat_id:
+        description: 'Telegram Chat ID for progress updates'
+      tg_message_id:
+        description: 'Telegram Message ID to edit'
 
 jobs:
   checkin:
@@ -38,6 +43,7 @@ jobs:
           PICACG_PASSWORD: ${{ secrets.PICACG_PASSWORD }}
           PICACG_BASE_URL: ${{ secrets.PICACG_BASE_URL }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TG_CHAT_ID: ${{ inputs.tg_chat_id || secrets.TG_CHAT_ID }}
+          TG_MESSAGE_ID: ${{ inputs.tg_message_id || '' }}
         run: |
           python checkin.py

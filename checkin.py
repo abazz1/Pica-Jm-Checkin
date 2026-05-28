@@ -12,10 +12,10 @@ from datetime import datetime
 
 
 class Progress:
-    def __init__(self, total, title=''):
+    def __init__(self, total, title='', tg_fn=None):
         self.total = total
         self.current = 0
-        self._last = ''
+        self.tg_fn = tg_fn
         if title:
             print(f'📋 {title}')
 
@@ -27,9 +27,13 @@ class Progress:
         self.current += 1
         pct = int(self.current / self.total * 100)
         print(f'  ▶ [{self.current}/{self.total}] |{self.bar(pct)}| {pct}% {text}')
+        if self.tg_fn:
+            self.tg_fn(self.current, self.total, text)
 
     def done(self, text='完成'):
         print(f'  ▶ [{self.total}/{self.total}] |████████████████████| 100% {text}')
+        if self.tg_fn:
+            self.tg_fn(self.total, self.total, text)
         print()
 
 _TC = "經獲幣獎勵連續錄簽過關體認證碼驗動態權確頁稱帳號郵件時間點對爲與個們說話題會發現見來還這麼嗎請問答回覆製圖發關懷準備機當瞭隻從業報麵條匯盡畫書僅廣義標誌導覽瀏覽選項單擊裏"
@@ -354,17 +358,53 @@ class PicacgCheckIn:
         return label
 
 
+def tg_progress(step, total, text):
+    bot_token = os.environ.get("TG_BOT_TOKEN", "")
+    chat_id = os.environ.get("TG_CHAT_ID", "")
+    msg_id = os.environ.get("TG_MESSAGE_ID", "")
+    if not bot_token or not chat_id or not msg_id:
+        return
+    pct = int(step / total * 100)
+    bar = '█' * (pct // 5) + '░' * (20 - pct // 5)
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{bot_token}/editMessageText",
+            json={
+                "chat_id": int(chat_id),
+                "message_id": int(msg_id),
+                "text": f"<b>每日签到</b>\n\n进度 |{bar}| {pct}%\n{step}/{total} | {text}",
+                "parse_mode": "HTML",
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
 def notify_tg(message):
     bot_token = os.environ.get("TG_BOT_TOKEN", "")
     chat_id = os.environ.get("TG_CHAT_ID", "")
+    msg_id = os.environ.get("TG_MESSAGE_ID", "")
     if not bot_token or not chat_id:
         return
     try:
-        requests.post(
-            f"https://api.telegram.org/bot{bot_token}/sendMessage",
-            json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
-            timeout=10,
-        )
+        if msg_id:
+            requests.post(
+                f"https://api.telegram.org/bot{bot_token}/editMessageText",
+                json={
+                    "chat_id": int(chat_id),
+                    "message_id": int(msg_id),
+                    "text": message,
+                    "parse_mode": "HTML",
+                },
+                timeout=10,
+            )
+        else:
+            requests.post(
+                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                json={"chat_id": int(chat_id), "text": message, "parse_mode": "HTML"},
+                timeout=10,
+            )
     except Exception:
         pass
 
@@ -384,7 +424,7 @@ if __name__ == "__main__":
     if pc_user and pc_pass: total_steps += 2
     total_steps += 1
 
-    p = Progress(total_steps, '签到流程')
+    p = Progress(total_steps, '签到流程', tg_fn=tg_progress)
 
     results = []
     step = 0
