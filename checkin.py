@@ -33,8 +33,6 @@ class Progress:
 
     def done(self, text='完成'):
         print(f'  ▶ [{self.total}/{self.total}] |████████████████████| 100% {text}')
-        if self.tg_fn:
-            self.tg_fn(self.total, self.total, text)
         print()
 
 _TC = "經獲幣獎勵連續錄簽過關體認證碼驗動態權確頁稱帳號郵件時間點對爲與個們說話題會發現見來還這麼嗎請問答回覆製圖發關懷準備機當瞭隻從業報麵條匯盡畫書僅廣義標誌導覽瀏覽選項單擊裏"
