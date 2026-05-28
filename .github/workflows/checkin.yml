@@ -11,24 +11,26 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Checkout
+      - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: 配置 Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Random delay (0-1h)
+      - name: 随机延迟 (仅定时触发)
         if: github.event_name == 'schedule'
         run: sleep $(( RANDOM % 3600 ))
 
-      - name: Install dependencies
+      - name: 安装依赖
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          echo "Installing requests and pycryptodome..."
+          pip install --upgrade pip -q
+          pip install -r requirements.txt -q
+          echo "Dependencies installed"
 
-      - name: Run check-in
+      - name: 执行签到
         env:
           JM_USERNAME: ${{ secrets.JM_USERNAME }}
           JM_PASSWORD: ${{ secrets.JM_PASSWORD }}

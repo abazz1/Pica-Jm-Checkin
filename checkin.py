@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import hashlib
 import hmac
@@ -8,6 +9,28 @@ import base64
 import requests
 from Crypto.Cipher import AES
 from datetime import datetime
+
+
+class Progress:
+    def __init__(self, total, title=''):
+        self.total = total
+        self.current = 0
+        self._last = ''
+        if title:
+            print(f'📋 {title}')
+
+    def bar(self, pct):
+        filled = pct // 5
+        return '█' * filled + '░' * (20 - filled)
+
+    def update(self, text):
+        self.current += 1
+        pct = int(self.current / self.total * 100)
+        print(f'  ▶ [{self.current}/{self.total}] |{self.bar(pct)}| {pct}% {text}')
+
+    def done(self, text='完成'):
+        print(f'  ▶ [{self.total}/{self.total}] |████████████████████| 100% {text}')
+        print()
 
 _TC = "經獲幣獎勵連續錄簽過關體認證碼驗動態權確頁稱帳號郵件時間點對爲與個們說話題會發現見來還這麼嗎請問答回覆製圖發關懷準備機當瞭隻從業報麵條匯盡畫書僅廣義標誌導覽瀏覽選項單擊裏"
 _SC = "经获币奖励连续录签过关体认证码验动态权确页称号邮件时间点对为与个们说话题会发现见来还这么吗请问答回复制图发关怀准备机当了只从业报面条汇尽画书仅广义标标志导览浏览选项单击里"
@@ -44,10 +67,11 @@ class JMCheckIn:
         "X-Requested-With": jm_pkg_name,
     }
 
-    def __init__(self, username, password):
+    def __init__(self, username, password, progress=None):
         self.username = username
         self.password = password
         self.base_url = None
+        self.progress = progress
         self._get_domains()
 
     def _decrypt_data(self, input_data, secret):
@@ -82,6 +106,8 @@ class JMCheckIn:
             print(f"[INFO] Using {len(servers)} fallback domains")
 
         self.servers = servers
+        if self.progress:
+            self.progress.update(f'JM: 获取 {len(servers)} 个域名')
 
     def _get_api_headers(self, timestamp):
         token_raw = hashlib.md5(f"{timestamp}{self.jm_auth_key}".encode()).digest()
@@ -148,6 +174,8 @@ class JMCheckIn:
             if result:
                 self.base_url = f"https://{server}"
                 print(f"[OK] Login success on {server}, uid={result['uid']}")
+                if self.progress:
+                    self.progress.update(f'JM: 登录成功')
                 return result["uid"]
 
         raise Exception("Login failed on all domains")
@@ -211,6 +239,8 @@ class JMCheckIn:
 
         line = f"{msg_sc}{reward}"
         print(f"[OK] Check-in result: {line}")
+        if self.progress:
+            self.progress.update(f'JM: {msg_sc}')
         return line
 
 
@@ -218,11 +248,12 @@ class PicacgCheckIn:
     API_KEY = "C69BAF41DA5ABD1FFEDC6D2FEA56B"
     HMAC_KEY = b'~d}$Q7$eIni=V)9\\RK/P.RM4;9[7|@/CA}b~OW!3?EV`:<>M7pddUBL5n|0/*Cn'
 
-    def __init__(self, username, password, base_url="https://picaapi.go2778.com"):
+    def __init__(self, username, password, base_url="https://picaapi.go2778.com", progress=None):
         self.username = username
         self.password = password
         self.base_url = base_url
         self.token = None
+        self.progress = progress
 
     def _sign(self, method, path, ts, nonce):
         raw = (path.lstrip('/') + ts + nonce + method.upper() + self.API_KEY).lower()
@@ -269,6 +300,8 @@ class PicacgCheckIn:
             raise Exception(f"Login failed: {data}")
         self.token = data["data"]["token"]
         print(f"[OK] Picacg login success")
+        if self.progress:
+            self.progress.update('Picacg: 登录成功')
         return self.token
 
     def profile(self):
@@ -316,6 +349,8 @@ class PicacgCheckIn:
         label = {
             "already_punched": "今日已签到，跳过",
         }.get(result, result)
+        if self.progress:
+            self.progress.update(f'Picacg: {label}')
         return label
 
 
@@ -338,43 +373,50 @@ if __name__ == "__main__":
     today = datetime.now().strftime("%Y-%m-%d")
     print(f"===== 每日签到 | {today} =====\n")
 
-    results = []
-
-    # JM Check-In
+    total_steps = 0
     jm_user = os.environ.get("JM_USERNAME", "")
     jm_pass = os.environ.get("JM_PASSWORD", "")
+    pc_user = os.environ.get("PICACG_USERNAME", "")
+    pc_pass = os.environ.get("PICACG_PASSWORD", "")
+    pc_url = os.environ.get("PICACG_BASE_URL", "https://picaapi.go2778.com")
+
+    if jm_user and jm_pass: total_steps += 3
+    if pc_user and pc_pass: total_steps += 2
+    total_steps += 1
+
+    p = Progress(total_steps, '签到流程')
+
+    results = []
+    step = 0
+
+    # JM Check-In
     if jm_user and jm_pass:
         try:
-            checker = JMCheckIn(jm_user, jm_pass)
+            checker = JMCheckIn(jm_user, jm_pass, progress=p)
             msg = checker.run()
             results.append(f"JM: {msg}")
         except Exception as e:
             err = f"JM failed: {e}"
-            print(f"[ERROR] {err}")
+            print(f"\n[ERROR] {err}")
             results.append(err)
     else:
         print("[SKIP] JM_USERNAME/JM_PASSWORD not set")
         results.append("JM: skipped")
 
-    print()
-
     # Picacg Punch-In
-    pc_user = os.environ.get("PICACG_USERNAME", "")
-    pc_pass = os.environ.get("PICACG_PASSWORD", "")
-    pc_url = os.environ.get("PICACG_BASE_URL", "https://picaapi.go2778.com")
     if pc_user and pc_pass:
         try:
-            checker = PicacgCheckIn(pc_user, pc_pass, pc_url)
+            checker = PicacgCheckIn(pc_user, pc_pass, pc_url, progress=p)
             msg = checker.run()
             results.append(f"Picacg: {msg}")
         except Exception as e:
             err = f"Picacg failed: {e}"
-            print(f"[ERROR] {err}")
+            print(f"\n[ERROR] {err}")
             results.append(err)
     else:
         print("[SKIP] PICACG_USERNAME/PICACG_PASSWORD not set")
         results.append("Picacg: skipped")
 
-    print(f"\n===== Done =====")
-
+    p.update('发送通知')
     notify_tg(f"<b>每日签到 | {today}</b>\n" + "\n".join(results))
+    p.done()
