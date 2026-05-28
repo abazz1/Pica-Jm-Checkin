@@ -263,13 +263,16 @@ class PicacgCheckIn:
         if self.is_punched():
             print("[*] Already punched in today, skipping")
             return "already_punched"
-        print("[*] Submitting Picacg punch-in...")
-        _, data = self._req("POST", "/users/punch-in", {})
-        res = data.get("data", {}).get("res", {})
-        status = res.get("status")
-        if status == "ok":
-            print(f"[OK] Punch-in success: {res.get('punchInLastDay')}")
-            return "ok"
+        for attempt in range(2):
+            print(f"[*] Submitting Picacg punch-in (attempt {attempt + 1})...")
+            _, data = self._req("POST", "/users/punch-in", {})
+            res = data.get("data", {}).get("res", {})
+            status = res.get("status")
+            if status == "ok":
+                print(f"[OK] Punch-in success: {res.get('punchInLastDay')}")
+                return "ok"
+            if attempt == 0:
+                print(f"[WARN] Punch-in failed, retrying...")
         print(f"[WARN] Punch-in result: {res}")
         return status
 

@@ -19,6 +19,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Random delay (0-1h)
+        run: sleep $(( RANDOM % 3600 ))
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
