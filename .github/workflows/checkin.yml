@@ -5,6 +5,8 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  schedule:
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       tg_message_id:
@@ -16,7 +18,37 @@ env:
   TG_MESSAGE_ID: ${{ github.event.inputs.tg_message_id }}
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - name: 检查定时设置
+        id: check
+        run: |
+          ENABLED="${{ vars.SCHEDULE_ENABLED }}"
+          TIME="${{ vars.SCHEDULE_TIME }}"
+          if [ "$ENABLED" != "true" ]; then
+            echo "❌ 定时签到已关闭"; echo "run=false" >> $GITHUB_OUTPUT; exit 0
+          fi
+          if [ -z "$TIME" ]; then
+            echo "❌ 未设置签到时间"; echo "run=false" >> $GITHUB_OUTPUT; exit 0
+          fi
+          CUR=$(( $(date -u +%H)*60 + $(date -u +%M) ))
+          SH=$(echo "$TIME" | cut -d: -f1); SM=$(echo "$TIME" | cut -d: -f2)
+          SCH=$(( 10#$SH*60 + 10#$SM ))
+          DIFF=$(( CUR - SCH )); DIFF=${DIFF#-}
+          if [ "$DIFF" -le 15 ]; then
+            echo "✅ 条件满足，开始签到"; echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "⏰ 时间不匹配 (当前=${CUR}min 设定=${SCH}min)，跳过"
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
   checkin:
+    needs: check
+    if: always() && (github.event_name != 'schedule' || needs.check.outputs.run == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
