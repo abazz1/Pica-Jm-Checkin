@@ -20,6 +20,7 @@ jobs:
           python-version: '3.12'
 
       - name: Random delay (0-1h)
+        if: github.event_name == 'schedule'
         run: sleep $(( RANDOM % 3600 ))
 
       - name: Install dependencies
