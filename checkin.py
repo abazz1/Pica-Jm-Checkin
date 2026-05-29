@@ -308,35 +308,17 @@ class PicacgCheckIn:
             self.progress.update('Picacg: 登录成功')
         return self.token
 
-    def profile(self):
-        _, data = self._req("GET", "/users/profile")
-        return data.get("data", {}).get("user", {})
-
-    def is_punched(self):
-        return self.profile().get("isPunched", False)
-
     def punch(self):
-        before = self.profile()
-        exp_before = before.get("exp", 0)
-        level_before = before.get("level", 0)
-
-        if before.get("isPunched"):
-            print("[*] Already punched in today, skipping")
-            return "already_punched"
-
         for attempt in range(2):
             print(f"[*] Submitting Picacg punch-in (attempt {attempt + 1})...")
             _, data = self._req("POST", "/users/punch-in", {})
             res = data.get("data", {}).get("res", {})
             status = res.get("status")
             if status == "ok":
-                after = self.profile()
-                exp_gain = after.get("exp", 0) - exp_before
+                after = self._req("GET", "/users/profile")[1].get("data", {}).get("user", {})
                 parts = [f"punchInLastDay={res.get('punchInLastDay')}"]
-                if exp_gain > 0:
-                    parts.append(f"exp+{exp_gain}")
-                if after.get("level", 0) > level_before:
-                    parts.append(f"level up! ({level_before}→{after['level']})")
+                if after.get("exp", 0) > 0:
+                    parts.append(f"exp={after.get('exp')}")
                 line = "签到成功 (" + ", ".join(parts) + ")"
                 print(f"[OK] Punch-in result: {line}")
                 return line
@@ -350,12 +332,9 @@ class PicacgCheckIn:
         print(f"=== Picacg Punch-In | {today} ===")
         self.login()
         result = self.punch()
-        label = {
-            "already_punched": "今日已签到，跳过",
-        }.get(result, result)
         if self.progress:
-            self.progress.update(f'Picacg: {label}')
-        return label
+            self.progress.update(f'Picacg: {result}')
+        return result
 
 
 def tg_progress(step, total, text):
