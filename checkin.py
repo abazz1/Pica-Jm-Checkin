@@ -413,6 +413,21 @@ if __name__ == "__main__":
     today = datetime.now().strftime("%Y-%m-%d")
     print(f"===== 每日签到 | {today} =====\n")
 
+    event = os.environ.get("GITHUB_EVENT_NAME", "")
+    if event == "schedule":
+        enabled = os.environ.get("SCHEDULE_ENABLED", "")
+        sched = os.environ.get("SCHEDULE_TIME", "")
+        if enabled != "true" or not sched:
+            print("[SKIP] 定时签到未开启或未设置时间")
+            sys.exit(0)
+        now = datetime.utcnow()
+        cur = now.hour * 60 + now.minute
+        sh, sm = int(sched.split(":")[0]), int(sched.split(":")[1])
+        sch = sh * 60 + sm
+        if abs(cur - sch) > 15:
+            print(f"[SKIP] 时间不匹配 (当前={cur}min 设定={sch}min)")
+            sys.exit(0)
+
     total_steps = int(os.environ.get("TG_TOTAL", "0"))
     current_step = int(os.environ.get("TG_CURRENT", "0"))
 
