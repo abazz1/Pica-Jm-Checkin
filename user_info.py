@@ -97,7 +97,6 @@ def get_jm_info():
                 "level": info.get("level", 1),
                 "level_name": info.get("level_name", ""),
                 "coin": info.get("coin", 0),
-                "exp_bar": f"{':star2:' * (exp_pct // 10)}{'·' * (10 - exp_pct // 10)}",
                 "exp_pct": exp_pct,
                 "favorites": f"{info.get('album_favorites', 0)}/{info.get('album_favorites_max', 0)}",
             }
@@ -152,7 +151,6 @@ def get_pica_info():
             "level": user.get("level", 1),
             "title": user.get("title", ""),
             "exp": user.get("exp", 0),
-            "exp_bar": f"{':star2:' * (exp_pct // 10)}{'·' * (10 - exp_pct // 10)}",
             "exp_pct": exp_pct,
             "gender": user.get("gender", "?"),
             "isPunched": user.get("isPunched", False),
@@ -164,22 +162,22 @@ def get_pica_info():
 if __name__ == "__main__":
     today = time.strftime("%Y-%m-%d", time.gmtime())
 
-    lines = [f"<b>:bust_in_silhouette: 账号信息 | {today}</b>\n"]
+    lines = [f"<b>👤 账号信息 | {today}</b>\n"]
 
     jm = get_jm_info()
     if jm:
         pct = jm.get("exp_pct", 0)
         bar = "█" * (pct // 10) + "░" * (10 - pct // 10)
         lines.append(
-            f"<b>JM :jp:</b>\n"
-            f"  :bust_in_silhouette: {jm['name']} (UID {jm['uid']})\n"
-            f"  :star: Lv.{jm['level']} ({jm['level_name']})\n"
-            f"  :moneybag: {jm['coin']} 金币\n"
-            f"  :heart: 收藏 {jm['favorites']}\n"
-            f"  :chart_with_upwards_trend: |{bar}| {pct}%"
+            f"<b>📖 JM Comic</b>\n"
+            f"  👤 {jm['name']} (UID {jm['uid']})\n"
+            f"  ⭐ Lv.{jm['level']} ({jm['level_name']})\n"
+            f"  💰 {jm['coin']} 金币\n"
+            f"  ❤️ 收藏 {jm['favorites']}\n"
+            f"  📈 |{bar}| {pct}%"
         )
     else:
-        lines.append("<b>JM</b> :x: 未配置或登录失败")
+        lines.append("<b>📖 JM</b> ❌ 未配置或登录失败")
 
     lines.append("")
 
@@ -187,17 +185,17 @@ if __name__ == "__main__":
     if pica:
         pct = pica.get("exp_pct", 0)
         bar = "█" * (pct // 10) + "░" * (10 - pct // 10)
-        punched = ":white_check_mark:" if pica["isPunched"] else ":x:"
+        punched = "✅" if pica["isPunched"] else "❌"
         lines.append(
-            f"<b>Picacg :cat:</b>\n"
-            f"  :bust_in_silhouette: {pica['name']} ({pica['email']})\n"
-            f"  :star: Lv.{pica['level']} ({pica['title']})\n"
-            f"  :sparkles: {pica['exp']} 经验\n"
-            f"  :pushpin: 今日签到: {punched}\n"
-            f"  :chart_with_upwards_trend: |{bar}| {pct}%"
+            f"<b>🐱 Picacg</b>\n"
+            f"  👤 {pica['name']} ({pica['email']})\n"
+            f"  ⭐ Lv.{pica['level']} ({pica['title']})\n"
+            f"  ✨ {pica['exp']} 经验\n"
+            f"  📌 今日签到: {punched}\n"
+            f"  📈 |{bar}| {pct}%"
         )
     else:
-        lines.append("<b>Picacg</b> :x: 未配置或登录失败")
+        lines.append("<b>🐱 Picacg</b> ❌ 未配置或登录失败")
 
     msg = "\n".join(lines)
     print(msg)
