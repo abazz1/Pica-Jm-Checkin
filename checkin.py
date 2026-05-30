@@ -374,7 +374,7 @@ class SXSYCheckIn:
             print(f"[SXSY] OCR host detection failed: {e}")
         for h in known:
             try:
-                r = requests.get(f"https://{h}/", timeout=10)
+                r = requests.get(f"https://{h}/", headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0'}, timeout=10)
                 if r.status_code == 200:
                     print(f"[SXSY] Using known host: {h}")
                     return h
@@ -383,9 +383,17 @@ class SXSYCheckIn:
         print(f"[SXSY] Using default host: {self.DEFAULT_HOST}")
         return self.DEFAULT_HOST
 
+    def _headers(self, referer=''):
+        return {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Referer': referer or f'https://{self.host}/',
+        }
+
     def get_param(self, session):
         url = f"https://{self.host}/member.php?mod=logging&action=login&infloat=yes&frommessage&inajax=1&ajaxtarget=messagelogin"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        headers = self._headers()
         r = session.get(url, headers=headers)
         formhash = re.search(r'formhash" value="([^"]+)"', r.text)
         seccodehash = re.search(r'seccode_([a-zA-Z0-9]{6})', r.text)
@@ -398,7 +406,7 @@ class SXSYCheckIn:
 
     def check_captcha(self, session, seccodehash, captcha):
         url = f"https://{self.host}/misc.php?mod=seccode&action=check&inajax=1&modid=member::logging&idhash={seccodehash}&secverify={captcha}"
-        r = session.get(url, headers={'User-Agent': 'Mozilla/5.0', 'Referer': f'https://{self.host}/member.php?mod=logging&action=login'})
+        r = session.get(url, headers=self._headers(f'https://{self.host}/member.php?mod=logging&action=login'))
         return 'succeed' in r.text
 
     def login(self, session, username, password, formhash, seccodehash, loginhash, captcha):
@@ -406,16 +414,14 @@ class SXSYCheckIn:
         payload = f"formhash={formhash}&referer=https://{self.host}/&loginfield={loginfield}&username={username}&password={password}&questionid=0&answer=&seccodehash={seccodehash}&seccodemodid=member::logging&seccodeverify={captcha}&cookietime=2592000"
         url = f"https://{self.host}/member.php?mod=logging&action=login&loginsubmit=yes&loginhash={loginhash}&inajax=1"
         payload = urllib.parse.quote(payload, safe='=&')
-        r = session.post(url, headers={
-            'Referer': f'https://{self.host}/',
-            'content-type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Mozilla/5.0',
-        }, data=payload)
+        headers = self._headers()
+        headers['content-type'] = 'application/x-www-form-urlencoded'
+        r = session.post(url, headers=headers, data=payload)
         return '欢迎您回来' in r.text
 
     def signin(self, session, sign_hash):
         url = f"https://{self.host}/plugin.php?id=k_misign:sign&operation=qiandao&format=global_usernav_extra&formhash={sign_hash}&inajax=1&ajaxtarget=k_misign_topb"
-        r = session.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+        r = session.get(url, headers=self._headers())
 
         m = re.search(r'签到验证[：:]\s*(\d+)\s*([+\-xX*/])\s*(\d+)\s*=\s*\?', r.text)
         if m:
@@ -425,7 +431,7 @@ class SXSYCheckIn:
             if fh:
                 sign_hash = fh.group(1)
             url2 = f"https://{self.host}/plugin.php?id=k_misign:sign&operation=qiandao&formhash={sign_hash}&format=global_usernav_extra&mathverify_answer={ans}"
-            r = session.get(url2, headers={'User-Agent': 'Mozilla/5.0'})
+            r = session.get(url2, headers=self._headers())
 
         return '今日已签' in r.text or '签到成功' in r.text
 
@@ -441,7 +447,7 @@ class SXSYCheckIn:
 
             for _ in range(5):
                 cu = f"https://{self.host}/misc.php?mod=seccode&update={random.randint(10000,99999)}&idhash={seccodehash}"
-                r = session.get(cu, headers={'User-Agent': 'Mozilla/5.0', 'Referer': f'https://{self.host}/member.php?mod=logging&action=login'})
+                r = session.get(cu, headers=self._headers(f'https://{self.host}/member.php?mod=logging&action=login'))
                 cap = ocr.classification(r.content)
                 if self.check_captcha(session, seccodehash, cap):
                     break
@@ -460,7 +466,7 @@ class SXSYCheckIn:
 
     def run_account(self, session, username):
         url = f"https://{self.host}/plugin.php?id=k_misign:sign"
-        r = session.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+        r = session.get(url, headers=self._headers())
         m = re.search(r'formhash=([a-zA-Z0-9]{8})', r.text)
         if not m:
             return '获取签到hash失败'
@@ -476,7 +482,7 @@ class SXSYCheckIn:
         results = []
         for idx, (acct_type, cred1, cred2) in enumerate(self.accounts, 1):
             session = requests.Session()
-            session.get(f"https://{self.host}/", headers={'User-Agent': 'Mozilla/5.0'})
+            session.get(f"https://{self.host}/", headers=self._headers())
 
             if acct_type == 'cookie':
                 for item in cred1.split(';'):
