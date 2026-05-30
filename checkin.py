@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 import time
 import random
 import hashlib
@@ -7,8 +8,6 @@ import hmac
 import json
 import uuid
 import base64
-import re
-import urllib.parse
 import requests
 from Crypto.Cipher import AES
 from datetime import datetime
@@ -339,177 +338,6 @@ class PicacgCheckIn:
         return result
 
 
-class SXSYCheckIn:
-    DEFAULT_HOST = "sxsy13.com"
-
-    def __init__(self, sxsy_env, progress=None):
-        self.accounts = []
-        self.progress = progress
-        self.host = self.DEFAULT_HOST
-        for line in sxsy_env.strip().split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-            if '&' in line:
-                email, password = line.split('&', 1)
-                self.accounts.append(('password', email.strip(), password.strip()))
-            else:
-                self.accounts.append(('cookie', line, None))
-
-    def get_host(self):
-        import ddddocr
-        import cloudscraper
-        scraper = cloudscraper.create_scraper()
-        known = ['sxsy13.com', 'sxsy21.com', 'sxsy19.com']
-        try:
-            ocr = ddddocr.DdddOcr(show_ad=False)
-            r = scraper.get('https://sxsy.org/site.jpg', timeout=10)
-            text = ocr.classification(r.content).lower().replace(' ', '')
-            m = re.search(r'(sxsy\d+\.?com)', text)
-            if m:
-                host = m.group(1).replace('。', '.').replace('，', '.')
-                if '.' not in host:
-                    host = host.replace('com', '.com')
-                print(f"[SXSY] OCR detected host: {host}")
-                return host
-        except Exception as e:
-            print(f"[SXSY] OCR host detection failed: {e}")
-        for h in known:
-            try:
-                r = scraper.get(f"https://{h}/", timeout=10)
-                if r.status_code == 200:
-                    print(f"[SXSY] Using known host: {h}")
-                    return h
-            except:
-                continue
-        print(f"[SXSY] Using default host: {self.DEFAULT_HOST}")
-        return self.DEFAULT_HOST
-
-    def _headers(self, referer=''):
-        return {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'Referer': referer or f'https://{self.host}/',
-        }
-
-    def get_param(self, session):
-        url = f"https://{self.host}/member.php?mod=logging&action=login&infloat=yes&frommessage&inajax=1&ajaxtarget=messagelogin"
-        headers = self._headers()
-        r = session.get(url, headers=headers)
-        formhash = re.search(r'formhash" value="([^"]+)"', r.text)
-        seccodehash = re.search(r'seccode_([a-zA-Z0-9]{6})', r.text)
-        loginhash = re.search(r'main_messaqge_([a-zA-Z0-9]{5})', r.text)
-        if not all([formhash, seccodehash, loginhash]):
-            print(f"[SXSY] get_param failed: status={r.status_code}, len={len(r.text)}, host={self.host}")
-            print(f"[SXSY] response preview: {r.text[:200]}")
-            return None, None, None
-        return formhash.group(1), seccodehash.group(1), loginhash.group(1)
-
-    def check_captcha(self, session, seccodehash, captcha):
-        url = f"https://{self.host}/misc.php?mod=seccode&action=check&inajax=1&modid=member::logging&idhash={seccodehash}&secverify={captcha}"
-        r = session.get(url, headers=self._headers(f'https://{self.host}/member.php?mod=logging&action=login'))
-        return 'succeed' in r.text
-
-    def login(self, session, username, password, formhash, seccodehash, loginhash, captcha):
-        loginfield = 'email' if '@' in username else 'username'
-        payload = f"formhash={formhash}&referer=https://{self.host}/&loginfield={loginfield}&username={username}&password={password}&questionid=0&answer=&seccodehash={seccodehash}&seccodemodid=member::logging&seccodeverify={captcha}&cookietime=2592000"
-        url = f"https://{self.host}/member.php?mod=logging&action=login&loginsubmit=yes&loginhash={loginhash}&inajax=1"
-        payload = urllib.parse.quote(payload, safe='=&')
-        headers = self._headers()
-        headers['content-type'] = 'application/x-www-form-urlencoded'
-        r = session.post(url, headers=headers, data=payload)
-        return '欢迎您回来' in r.text
-
-    def signin(self, session, sign_hash):
-        url = f"https://{self.host}/plugin.php?id=k_misign:sign&operation=qiandao&format=global_usernav_extra&formhash={sign_hash}&inajax=1&ajaxtarget=k_misign_topb"
-        r = session.get(url, headers=self._headers())
-
-        m = re.search(r'签到验证[：:]\s*(\d+)\s*([+\-xX*/])\s*(\d+)\s*=\s*\?', r.text)
-        if m:
-            left, op, right = int(m.group(1)), m.group(2), int(m.group(3))
-            ans = str({'+': left + right, '-': left - right, 'x': left * right, 'X': left * right, '*': left * right}.get(op, 0))
-            fh = re.search(r'formhash=([a-zA-Z0-9]{8})', r.text)
-            if fh:
-                sign_hash = fh.group(1)
-            url2 = f"https://{self.host}/plugin.php?id=k_misign:sign&operation=qiandao&formhash={sign_hash}&format=global_usernav_extra&mathverify_answer={ans}"
-            r = session.get(url2, headers=self._headers())
-
-        return '今日已签' in r.text or '签到成功' in r.text
-
-    def process_account(self, session, username, password, max_retries=3):
-        import ddddocr
-        ocr = ddddocr.DdddOcr(show_ad=False)
-        for retry in range(max_retries):
-            formhash, seccodehash, loginhash = self.get_param(session)
-            if not all([formhash, seccodehash, loginhash]):
-                if retry < max_retries - 1:
-                    continue
-                return False, '获取登录参数失败'
-
-            for _ in range(5):
-                cu = f"https://{self.host}/misc.php?mod=seccode&update={random.randint(10000,99999)}&idhash={seccodehash}"
-                r = session.get(cu, headers=self._headers(f'https://{self.host}/member.php?mod=logging&action=login'))
-                cap = ocr.classification(r.content)
-                if self.check_captcha(session, seccodehash, cap):
-                    break
-            else:
-                if retry < max_retries - 1:
-                    continue
-                return False, '验证码识别失败'
-
-            if self.login(session, username, password, formhash, seccodehash, loginhash, cap):
-                return True, '登录成功'
-
-            if retry < max_retries - 1:
-                print(f"  登录失败，第{retry+2}次重试...")
-                time.sleep(3)
-        return False, '登录失败'
-
-    def run_account(self, session, username):
-        url = f"https://{self.host}/plugin.php?id=k_misign:sign"
-        r = session.get(url, headers=self._headers())
-        m = re.search(r'formhash=([a-zA-Z0-9]{8})', r.text)
-        if not m:
-            return '获取签到hash失败'
-        if self.signin(session, m.group(1)):
-            return '签到成功'
-        return '签到失败'
-
-    def run(self):
-        import ddddocr
-        import cloudscraper
-        today = datetime.now().strftime("%Y-%m-%d")
-        print(f"=== SXSY Check-In | {today} ===")
-        self.host = self.get_host()
-        results = []
-        for idx, (acct_type, cred1, cred2) in enumerate(self.accounts, 1):
-            session = cloudscraper.create_scraper()
-            session.get(f"https://{self.host}/", headers=self._headers())
-
-            if acct_type == 'cookie':
-                for item in cred1.split(';'):
-                    if '=' in item:
-                        k, v = item.split('=', 1)
-                        session.cookies.set(k.strip(), v.strip())
-                ok, msg = True, 'cookie加载成功'
-            else:
-                ok, msg = self.process_account(session, cred1, cred2)
-
-            if not ok:
-                results.append(f"SXSY 账号{idx}: ❌ {msg}")
-                print(f"  [{idx}] {msg}")
-                continue
-
-            result = self.run_account(session, cred1)
-            print(f"  [{idx}] {cred1}: {result}")
-            results.append(f"SXSY 账号{idx} ({cred1}): {result}")
-
-        if self.progress:
-            self.progress.update(f'SXSY: {", ".join(r.split(": ")[-1] for r in results)}')
-        return "\n".join(results)
-
-
 def tg_progress(step, total, text):
     bot_token = os.environ.get("TG_BOT_TOKEN", "")
     chat_id = os.environ.get("TG_CHAT_ID", "")
@@ -626,13 +454,23 @@ if __name__ == "__main__":
 
     sxsy_env = os.environ.get("SXSY", "")
     if sxsy_env:
+        p.update('SXSY: 开始签到')
         try:
-            checker = SXSYCheckIn(sxsy_env, progress=p)
-            msg = checker.run()
-            results.append(f"SXSY: {msg}")
+            r = subprocess.run(
+                [sys.executable, 'sxsy_checkin.py'],
+                env={**os.environ, 'sxsy': sxsy_env},
+                capture_output=True, text=True, timeout=120,
+            )
+            out = r.stdout.strip()
+            err = r.stderr.strip()
+            print(out)
+            if err:
+                print(err)
+            last_line = [l for l in out.split('\n') if l.strip()][-1] if out.strip() else ''
+            results.append(f"SXSY: {'✅' if '成功' in last_line or '已签' in last_line else '⚠️ ' + last_line}")
+        except subprocess.TimeoutExpired:
+            results.append("SXSY: ❌ 超时")
         except Exception as e:
-            err = f"SXSY failed: {e}"
-            print(f"\n[ERROR] {err}")
             results.append(f"SXSY: ❌ {e}")
     else:
         print("[SKIP] SXSY not set")
