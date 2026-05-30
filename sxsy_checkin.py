@@ -30,47 +30,10 @@ import base64
 import random
 
 try:
-    from curl_cffi import requests as _cffi
-    _CFFI_OK = True
+    import sxsy_proxy
+    sxsy_proxy.patch_requests()
 except:
-    _CFFI_OK = False
-if not _CFFI_OK:
-    try:
-        import cloudscraper
-        _CS_OK = True
-    except:
-        _CS_OK = False
-else:
-    _CS_OK = False
-
-
-class _CFSession(requests.Session):
-    def request(self, *a, **kw):
-        kw.setdefault('timeout', 20)
-        r = super().request(*a, **kw)
-        if 'Just a moment' in r.text or r.status_code == 403:
-            if _CFFI_OK:
-                return _cffi.Session().request(*a, **kw)
-            if _CS_OK:
-                return cloudscraper.create_scraper().request(*a, **kw)
-        return r
-
-
-def _cf_get(url, **kw):
-    kw.setdefault('timeout', 20)
-    r = _ORIG_GET(url, **kw)
-    if 'Just a moment' in r.text or r.status_code == 403:
-        if _CFFI_OK:
-            return _cffi.get(url, impersonate='chrome110', **kw)
-        if _CS_OK:
-            return cloudscraper.create_scraper().get(url, **kw)
-    return r
-
-
-_ORIG_GET = requests.get
-_ORIG_SESSION = requests.Session
-requests.get = _cf_get
-requests.Session = _CFSession
+    pass
 import time
 import json
 from datetime import datetime

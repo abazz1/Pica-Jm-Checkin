@@ -79,6 +79,8 @@ jobs:
           PICACG_PASSWORD: ${{ secrets.PICACG_PASSWORD }}
           PICACG_BASE_URL: ${{ secrets.PICACG_BASE_URL }}
           SXSY: ${{ secrets.SXSY }}
+          SXSY_PROXY_URL: ${{ secrets.SXSY_PROXY_URL }}
+          SXSY_PROXY_TOKEN: ${{ secrets.SXSY_PROXY_TOKEN }}
           TG_TOTAL: ${{ steps.calc.outputs.total }}
           TG_CURRENT: 0
           GITHUB_EVENT_NAME: ${{ github.event_name }}
