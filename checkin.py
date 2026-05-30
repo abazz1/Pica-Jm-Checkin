@@ -429,31 +429,28 @@ if __name__ == "__main__":
         try:
             checker = JMCheckIn(jm_user, jm_pass, progress=p)
             msg = checker.run()
-            results.append(f"📖 {msg}")
+            results.append(f"JM: {msg}")
         except Exception as e:
             err = f"JM failed: {e}"
             print(f"\n[ERROR] {err}")
-            results.append(f"📖 ❌ {e}")
+            results.append(f"JM: ❌ {e}")
     else:
         print("[SKIP] JM_USERNAME/JM_PASSWORD not set")
-        results.append("📖 ⏭️ 未配置")
+        results.append("JM: 未配置")
 
     if pc_user and pc_pass:
         try:
             checker = PicacgCheckIn(pc_user, pc_pass, pc_url, progress=p)
             msg = checker.run()
-            results.append(f"🐱 {msg}")
+            results.append(f"Picacg: {msg}")
         except Exception as e:
             err = f"Picacg failed: {e}"
             print(f"\n[ERROR] {err}")
-            results.append(f"🐱 ❌ {e}")
+            results.append(f"Picacg: ❌ {e}")
     else:
         print("[SKIP] PICACG_USERNAME/PICACG_PASSWORD not set")
-        results.append("🐱 ⏭️ 未配置")
+        results.append("Picacg: 未配置")
 
     p.update('发送通知')
-    notify_tg(
-        "<b>📋 每日签到 | " + today + "</b>\n\n"
-        + "\n\n".join(results)
-    )
+    notify_tg(f"<b>每日签到 | {today}</b>\n" + "\n".join(results))
     p.done()

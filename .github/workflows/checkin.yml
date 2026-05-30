@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: calc
+      - name: ⏳ 计算总步数
         id: calc
         run: |
           INFRA=3; JM=0; PIC=0
@@ -41,18 +41,20 @@ jobs:
           echo "TG_TOTAL=$TOTAL" >> $GITHUB_ENV
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
 
-      - uses: actions/checkout@v4
+      - name: 检出代码
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: 配置 Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: install deps
+      - name: 安装依赖
         run: |
           pip install --upgrade pip -q
           pip install -r requirements.txt -q
 
-      - name: update secret
+      - name: 更新密钥
         if: github.event.inputs.tg_action == 'set'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -64,9 +66,9 @@ jobs:
           curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/editMessageText" \
             -d "chat_id=${TG_CHAT_ID}" \
             -d "message_id=${TG_MESSAGE_ID}" \
-            -d "text=OK ${SECRET_NAME} updated"
+            -d "text=✅ ${SECRET_NAME} 已更新"
 
-      - name: run action
+      - name: 执行操作
         if: github.event.inputs.tg_action != 'set'
         env:
           JM_USERNAME: ${{ secrets.JM_USERNAME }}
@@ -74,6 +76,8 @@ jobs:
           PICACG_USERNAME: ${{ secrets.PICACG_USERNAME }}
           PICACG_PASSWORD: ${{ secrets.PICACG_PASSWORD }}
           PICACG_BASE_URL: ${{ secrets.PICACG_BASE_URL }}
+          TG_TOTAL: ${{ steps.calc.outputs.total }}
+          TG_CURRENT: 0
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           SCHEDULE_ENABLED: ${{ vars.SCHEDULE_ENABLED }}
           SCHEDULE_TIME: ${{ vars.SCHEDULE_TIME }}
