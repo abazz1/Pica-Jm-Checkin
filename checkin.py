@@ -358,10 +358,12 @@ class SXSYCheckIn:
 
     def get_host(self):
         import ddddocr
+        import cloudscraper
+        scraper = cloudscraper.create_scraper()
         known = ['sxsy13.com', 'sxsy21.com', 'sxsy19.com']
         try:
             ocr = ddddocr.DdddOcr(show_ad=False)
-            r = requests.get('https://sxsy.org/site.jpg', timeout=10)
+            r = scraper.get('https://sxsy.org/site.jpg', timeout=10)
             text = ocr.classification(r.content).lower().replace(' ', '')
             m = re.search(r'(sxsy\d+\.?com)', text)
             if m:
@@ -374,7 +376,7 @@ class SXSYCheckIn:
             print(f"[SXSY] OCR host detection failed: {e}")
         for h in known:
             try:
-                r = requests.get(f"https://{h}/", headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0'}, timeout=10)
+                r = scraper.get(f"https://{h}/", timeout=10)
                 if r.status_code == 200:
                     print(f"[SXSY] Using known host: {h}")
                     return h
@@ -476,12 +478,13 @@ class SXSYCheckIn:
 
     def run(self):
         import ddddocr
+        import cloudscraper
         today = datetime.now().strftime("%Y-%m-%d")
         print(f"=== SXSY Check-In | {today} ===")
         self.host = self.get_host()
         results = []
         for idx, (acct_type, cred1, cred2) in enumerate(self.accounts, 1):
-            session = requests.Session()
+            session = cloudscraper.create_scraper()
             session.get(f"https://{self.host}/", headers=self._headers())
 
             if acct_type == 'cookie':
