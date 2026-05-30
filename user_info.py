@@ -163,25 +163,23 @@ def get_pica_info():
         return None
 
 
-def _try_cloudscraper():
-    try:
-        import cloudscraper
-        return cloudscraper.create_scraper()
-    except:
-        return None
-
-
 def _make_req(url, session=None, method='get', **kwargs):
-    kwargs.setdefault('timeout', 15)
+    kwargs.setdefault('timeout', 20)
     kwargs.setdefault('headers', {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
     s = session or requests
     try:
         r = getattr(s, method)(url, **kwargs)
-        is_cf = 'Just a moment' in r.text or r.status_code == 403
-        if is_cf and s is requests:
-            cs = _try_cloudscraper()
-            if cs:
-                return getattr(cs, method)(url, **kwargs)
+        if 'Just a moment' in r.text or r.status_code == 403:
+            try:
+                from curl_cffi import requests as _cffi
+                return getattr(_cffi, method)(url, impersonate='chrome110', **kwargs)
+            except:
+                pass
+            try:
+                import cloudscraper
+                return getattr(cloudscraper.create_scraper(), method)(url, **kwargs)
+            except:
+                pass
         return r
     except Exception as e:
         raise e
