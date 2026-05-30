@@ -90,7 +90,8 @@ def get_jm_info():
             while e > s and dec[e] not in ("}"): e -= 1
             info = json.loads(dec[s:e+1])
 
-            exp_pct = round(int(info.get("exp", 0)) / int(info.get("nextLevelExp", 1)) * 100)
+            next_exp = int(info.get("nextLevelExp", 0))
+            exp_pct = min(round(int(info.get("exp", 0)) / next_exp * 100), 100) if next_exp > 0 else 100
             return {
                 "uid": info.get("uid", "?"),
                 "name": info.get("username", "?"),
@@ -144,7 +145,8 @@ def get_pica_info():
         s, d = req("GET", "/users/profile", token)
         user = d.get("data", {}).get("user", {})
 
-        exp_pct = round(user.get("exp", 0) / max(user.get("nextLevelExp", 1), 1) * 100)
+        next_exp = user.get("nextLevelExp", 0)
+        exp_pct = min(round(user.get("exp", 0) / next_exp * 100), 100) if next_exp > 0 else 100
         return {
             "name": user.get("name", "?"),
             "email": user.get("email", "?"),
