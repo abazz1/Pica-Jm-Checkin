@@ -11,6 +11,9 @@ on:
     inputs:
       tg_message_id:
         description: 'Telegram Message ID to edit'
+      tg_action:
+        description: 'Action: checkin or info'
+        default: 'checkin'
 
 env:
   TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
@@ -62,7 +65,7 @@ jobs:
           echo "TG_CURRENT=3" >> $GITHUB_ENV
           python3 tg_progress.py 3 "$TG_TOTAL" '安装依赖 ✅'
 
-      - name: 执行签到
+      - name: 执行操作
         env:
           JM_USERNAME: ${{ secrets.JM_USERNAME }}
           JM_PASSWORD: ${{ secrets.JM_PASSWORD }}
@@ -75,4 +78,8 @@ jobs:
           SCHEDULE_ENABLED: ${{ vars.SCHEDULE_ENABLED }}
           SCHEDULE_TIME: ${{ vars.SCHEDULE_TIME }}
         run: |
-          python checkin.py
+          if [ "${{ github.event.inputs.tg_action }}" = "info" ]; then
+            python user_info.py
+          else
+            python checkin.py
+          fi
