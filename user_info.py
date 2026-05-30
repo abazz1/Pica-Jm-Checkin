@@ -163,6 +163,19 @@ def get_pica_info():
         return None
 
 
+def pica_exp_progress(level, exp):
+    n = int(level)
+    e = int(exp)
+    if n <= 0:
+        return 0
+    prev_exp = 0 if n <= 1 else 100 * n * (n - 1)
+    next_exp = 100 * (n + 1) * n
+    range_exp = next_exp - prev_exp
+    if range_exp <= 0:
+        return 100
+    return min(max(round((e - prev_exp) / range_exp * 100), 0), 100)
+
+
 if __name__ == "__main__":
     today = time.strftime("%Y-%m-%d", time.gmtime())
 
@@ -188,13 +201,16 @@ if __name__ == "__main__":
 
     pica = get_pica_info()
     if pica:
+        pct = pica_exp_progress(pica["level"], pica["exp"])
+        bar = "█" * (pct // 10) + "░" * (10 - pct // 10)
         punched = "✅" if pica["isPunched"] else "❌"
         lines.append(
             f"<b>🐱 Picacg</b>\n"
             f"  👤 {pica['name']} ({pica['email']})\n"
             f"  ⭐ Lv.{pica['level']} ({pica['title']})\n"
             f"  ✨ {pica['exp']} 经验\n"
-            f"  📌 今日签到: {punched}"
+            f"  📌 今日签到: {punched}\n"
+            f"  📈 |{bar}| {pct}%"
         )
     else:
         lines.append("<b>🐱 Picacg</b> ❌ 未配置或登录失败")
