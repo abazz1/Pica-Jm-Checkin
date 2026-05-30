@@ -34,11 +34,10 @@ jobs:
       - name: ⏳ 计算总步数
         id: calc
         run: |
-          INFRA=3; JM=0; PIC=0; SXSY=0
+          INFRA=3; JM=0; PIC=0
           [ -n "${{ secrets.JM_USERNAME }}" ] && JM=3
           [ -n "${{ secrets.PICACG_USERNAME }}" ] && PIC=2
-          [ -n "${{ secrets.SXSY }}" ] && SXSY=2
-          TOTAL=$((INFRA + JM + PIC + SXSY + 1))
+          TOTAL=$((INFRA + JM + PIC + 1))
           echo "TG_TOTAL=$TOTAL" >> $GITHUB_ENV
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
 
@@ -78,9 +77,6 @@ jobs:
           PICACG_USERNAME: ${{ secrets.PICACG_USERNAME }}
           PICACG_PASSWORD: ${{ secrets.PICACG_PASSWORD }}
           PICACG_BASE_URL: ${{ secrets.PICACG_BASE_URL }}
-          SXSY: ${{ secrets.SXSY }}
-          SXSY_PROXY_URL: ${{ secrets.SXSY_PROXY_URL }}
-          SXSY_PROXY_TOKEN: ${{ secrets.SXSY_PROXY_TOKEN }}
           TG_TOTAL: ${{ steps.calc.outputs.total }}
           TG_CURRENT: 0
           GITHUB_EVENT_NAME: ${{ github.event_name }}

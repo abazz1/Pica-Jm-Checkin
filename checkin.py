@@ -452,30 +452,6 @@ if __name__ == "__main__":
         print("[SKIP] PICACG_USERNAME/PICACG_PASSWORD not set")
         results.append("Picacg: 未配置")
 
-    sxsy_env = os.environ.get("SXSY", "")
-    if sxsy_env:
-        p.update('SXSY: 开始签到')
-        try:
-            r = subprocess.run(
-                [sys.executable, 'sxsy_checkin.py'],
-                env={**os.environ, 'sxsy': sxsy_env},
-                capture_output=True, text=True, timeout=120,
-            )
-            out = r.stdout.strip()
-            err = r.stderr.strip()
-            print(out)
-            if err:
-                print(err)
-            last_line = [l for l in out.split('\n') if l.strip()][-1] if out.strip() else ''
-            results.append(f"SXSY: {'✅' if '成功' in last_line or '已签' in last_line else '⚠️ ' + last_line}")
-        except subprocess.TimeoutExpired:
-            results.append("SXSY: ❌ 超时")
-        except Exception as e:
-            results.append(f"SXSY: ❌ {e}")
-    else:
-        print("[SKIP] SXSY not set")
-        results.append("SXSY: 未配置")
-
     p.update('发送通知')
     notify_tg(f"<b>每日签到 | {today}</b>\n" + "\n".join(results))
     p.done()
