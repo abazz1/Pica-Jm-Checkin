@@ -12,8 +12,12 @@ on:
       tg_message_id:
         description: 'Telegram Message ID to edit'
       tg_action:
-        description: 'Action: checkin or info'
+        description: 'Action: checkin, info, or set'
         default: 'checkin'
+      secret_name:
+        description: 'Secret name for set action'
+      secret_value:
+        description: 'Secret value for set action'
 
 env:
   TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
@@ -28,6 +32,7 @@ jobs:
 
     steps:
       - name: ⏳ 计算总步数
+        if: github.event.inputs.tg_action != 'set'
         id: calc
         run: |
           INFRA=3; JM=0; PIC=0
@@ -38,34 +43,64 @@ jobs:
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
 
       - name: 检出代码
+        if: github.event.inputs.tg_action != 'set'
         uses: actions/checkout@v4
 
       - name: ⏳ 检出代码
+        if: github.event.inputs.tg_action != 'set'
         run: |
           echo "TG_CURRENT=1" >> $GITHUB_ENV
           python3 tg_progress.py 1 "$TG_TOTAL" '检出代码 ✅'
 
       - name: 配置 Python
+        if: github.event.inputs.tg_action != 'set'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: ⏳ 配置 Python
+        if: github.event.inputs.tg_action != 'set'
         run: |
           echo "TG_CURRENT=2" >> $GITHUB_ENV
           python3 tg_progress.py 2 "$TG_TOTAL" '配置 Python ✅'
 
       - name: 安装依赖
+        if: github.event.inputs.tg_action != 'set'
         run: |
           pip install --upgrade pip -q
           pip install -r requirements.txt -q
 
       - name: ⏳ 安装依赖
+        if: github.event.inputs.tg_action != 'set'
         run: |
           echo "TG_CURRENT=3" >> $GITHUB_ENV
           python3 tg_progress.py 3 "$TG_TOTAL" '安装依赖 ✅'
 
+      - name: 更新密钥
+        if: github.event.inputs.tg_action == 'set'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          SECRET_NAME: ${{ github.event.inputs.secret_name }}
+          SECRET_VALUE: ${{ github.event.inputs.secret_value }}
+        run: |
+          echo "::add-mask::$SECRET_VALUE"
+          gh secret set "$SECRET_NAME" --body "$SECRET_VALUE" --repo abazz1/Pica-Jm-Checkin
+          python3 -c "
+import os, json, urllib.request
+bt = os.environ.get('TG_BOT_TOKEN', '')
+ci = os.environ.get('TG_CHAT_ID', '')
+mi = os.environ.get('TG_MESSAGE_ID', '')
+sn = os.environ.get('SECRET_NAME', '')
+if bt and ci and mi:
+    data = json.dumps({
+        'chat_id': int(ci), 'message_id': int(mi),
+        'text': '✅ ' + sn + ' 已更新'
+    }).encode()
+    urllib.request.urlopen(f'https://api.telegram.org/bot{bt}/editMessageText', data)
+"
+
       - name: 执行操作
+        if: github.event.inputs.tg_action != 'set'
         env:
           JM_USERNAME: ${{ secrets.JM_USERNAME }}
           JM_PASSWORD: ${{ secrets.JM_PASSWORD }}
