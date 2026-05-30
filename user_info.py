@@ -163,6 +163,30 @@ def get_pica_info():
         return None
 
 
+def _try_cloudscraper():
+    try:
+        import cloudscraper
+        return cloudscraper.create_scraper()
+    except:
+        return None
+
+
+def _make_req(url, session=None, method='get', **kwargs):
+    kwargs.setdefault('timeout', 15)
+    kwargs.setdefault('headers', {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+    s = session or requests
+    try:
+        r = getattr(s, method)(url, **kwargs)
+        is_cf = 'Just a moment' in r.text or r.status_code == 403
+        if is_cf and s is requests:
+            cs = _try_cloudscraper()
+            if cs:
+                return getattr(cs, method)(url, **kwargs)
+        return r
+    except Exception as e:
+        raise e
+
+
 def get_sxsy_info():
     sxsy_env = os.environ.get("SXSY", "")
     if not sxsy_env:
@@ -198,7 +222,11 @@ def get_sxsy_info():
     for idx, (user, pwd) in enumerate(accounts, 1):
         session = req.Session()
         session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
-        session.get(f"https://{host}/", timeout=10)
+        try:
+            _make_req(f"https://{host}/", session=session)
+        except Exception as e:
+            lines.append(f"  👤 SXSY 账号{idx}: ❌ 连接失败 ({host}, {e})")
+            continue
 
         cookie_file = 'sxsy_checkin_cookie.json'
         cookies_ok = False
@@ -211,7 +239,7 @@ def get_sxsy_info():
                         if '=' in item:
                             k, v = item.split('=', 1)
                             session.cookies.set(k.strip(), v.strip())
-                    r = session.get(f"https://{host}/home.php?mod=space", timeout=10)
+                    r = _make_req(f"https://{host}/home.php?mod=space", session=session)
                     if '请先登录' not in r.text:
                         cookies_ok = True
             except:
@@ -219,21 +247,25 @@ def get_sxsy_info():
 
         if not cookies_ok and pwd:
             try:
-                r = session.get(f"https://{host}/member.php?mod=logging&action=login&infloat=yes&frommessage&inajax=1&ajaxtarget=messagelogin", timeout=10)
+                r = _make_req(f"https://{host}/member.php?mod=logging&action=login&infloat=yes&frommessage&inajax=1&ajaxtarget=messagelogin", session=session)
+                if r.status_code != 200 or len(r.text) < 100:
+                    lines.append(f"  👤 SXSY 账号{idx}: ❌ Cloudflare 拦截 (HTTP {r.status_code})")
+                    continue
                 formhash = re.search(r'formhash" value="([^"]+)"', r.text)
                 seccodehash = re.search(r'seccode_([a-zA-Z0-9]{6})', r.text)
                 loginhash = re.search(r'main_messaqge_([a-zA-Z0-9]{5})', r.text)
                 if not all([formhash, seccodehash, loginhash]):
-                    lines.append(f"  👤 SXSY 账号{idx}: ❌ 获取参数失败")
+                    snippet = r.text[:200].replace('\n', ' ')
+                    lines.append(f"  👤 SXSY 账号{idx}: ❌ 获取参数失败 (HTTP {r.status_code}, {snippet})")
                     continue
 
                 ocr = ddddocr.DdddOcr(show_ad=False)
                 for _ in range(5):
                     cu = f"https://{host}/misc.php?mod=seccode&update={random.randint(10000,99999)}&idhash={seccodehash.group(1)}"
-                    r2 = session.get(cu, headers={'Referer': f'https://{host}/member.php?mod=logging&action=login'}, timeout=10)
+                    r2 = _make_req(cu, session=session, headers={'Referer': f'https://{host}/member.php?mod=logging&action=login'})
                     cap = ocr.classification(r2.content)
                     vu = f"https://{host}/misc.php?mod=seccode&action=check&inajax=1&modid=member::logging&idhash={seccodehash.group(1)}&secverify={cap}"
-                    r3 = session.get(vu, headers={'Referer': f'https://{host}/member.php?mod=logging&action=login'}, timeout=10)
+                    r3 = _make_req(vu, session=session, headers={'Referer': f'https://{host}/member.php?mod=logging&action=login'})
                     if 'succeed' in r3.text:
                         break
                 else:
@@ -244,7 +276,7 @@ def get_sxsy_info():
                 loginfield = 'email' if '@' in user else 'username'
                 payload = f"formhash={formhash.group(1)}&referer=https://{host}/&loginfield={loginfield}&username={user}&password={pwd}&questionid=0&answer=&seccodehash={seccodehash.group(1)}&seccodemodid=member::logging&seccodeverify={cap}&cookietime=2592000"
                 lurl = f"https://{host}/member.php?mod=logging&action=login&loginsubmit=yes&loginhash={loginhash.group(1)}&inajax=1"
-                r = session.post(lurl, headers={'Referer': f'https://{host}/', 'content-type': 'application/x-www-form-urlencoded'}, data=urllib.parse.quote(payload, safe='=&'), timeout=10)
+                r = _make_req(lurl, session=session, method='post', headers={'Referer': f'https://{host}/', 'content-type': 'application/x-www-form-urlencoded'}, data=urllib.parse.quote(payload, safe='=&'))
                 if '欢迎您回来' not in r.text:
                     lines.append(f"  👤 SXSY 账号{idx}: ❌ 登录失败")
                     continue
@@ -253,7 +285,7 @@ def get_sxsy_info():
                 continue
 
         try:
-            r = session.get(f"https://{host}/home.php?mod=spacecp&ac=credit&showcredit=1", timeout=10)
+            r = _make_req(f"https://{host}/home.php?mod=spacecp&ac=credit&showcredit=1", session=session)
             m_money = re.search(r'金钱: </em>(\d+)', r.text)
             m_uid = re.search(r'uid=(\d+)', r.text)
             uid = m_uid.group(1) if m_uid else '?'
@@ -263,6 +295,7 @@ def get_sxsy_info():
             lines.append(f"  👤 SXSY {display_name} (UID {uid})  💰 {money} 金钱")
         except Exception as e:
             lines.append(f"  👤 SXSY 账号{idx}: ❌ 获取信息失败")
+            continue
 
     return '\n'.join(lines) if lines else None
 

@@ -28,6 +28,30 @@ import logging
 import traceback
 import base64
 import random
+
+try:
+    import cloudscraper
+    _ORIG_GET = requests.get
+    _ORIG_SESSION = requests.Session
+    class _CFSession(requests.Session):
+        def request(self, *a, **kw):
+            kw.setdefault('timeout', 15)
+            r = super().request(*a, **kw)
+            if 'Just a moment' in r.text or r.status_code == 403:
+                cs = cloudscraper.create_scraper()
+                cs.headers.update(dict(self.headers))
+                return cs.request(*a, **kw)
+            return r
+    def _cf_get(url, **kw):
+        kw.setdefault('timeout', 15)
+        r = _ORIG_GET(url, **kw)
+        if 'Just a moment' in r.text or r.status_code == 403:
+            return cloudscraper.create_scraper().get(url, **kw)
+        return r
+    requests.get = _cf_get
+    requests.Session = _CFSession
+except:
+    pass
 import time
 import json
 from datetime import datetime
