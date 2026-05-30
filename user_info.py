@@ -171,6 +171,7 @@ except:
 
 
 def get_sxsy_info():
+    import re, urllib.parse
     sxsy_env = os.environ.get("SXSY", "")
     if not sxsy_env:
         return None
@@ -181,7 +182,6 @@ def get_sxsy_info():
         r = req.get('https://sxsy.org/site.jpg', timeout=10)
         import ddddocr
         text = ddddocr.DdddOcr(show_ad=False).classification(r.content).lower().replace(' ', '')
-        import re
         m = re.search(r'(sxsy\d+\.?com)', text)
         if m:
             h = m.group(1).replace('。', '.').replace('，', '.')
@@ -255,7 +255,6 @@ def get_sxsy_info():
                     lines.append(f"  👤 SXSY 账号{idx}: ❌ 验证码失败")
                     continue
 
-                import urllib.parse
                 loginfield = 'email' if '@' in user else 'username'
                 payload = f"formhash={formhash.group(1)}&referer=https://{host}/&loginfield={loginfield}&username={user}&password={pwd}&questionid=0&answer=&seccodehash={seccodehash.group(1)}&seccodemodid=member::logging&seccodeverify={cap}&cookietime=2592000"
                 lurl = f"https://{host}/member.php?mod=logging&action=login&loginsubmit=yes&loginhash={loginhash.group(1)}&inajax=1"
