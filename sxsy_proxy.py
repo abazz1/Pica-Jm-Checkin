@@ -20,6 +20,9 @@ def patch_requests():
             self._proxy_url = pu
 
         def request(self, method, url, **kwargs):
+            if not re.match(r'https?://(sxsy\d+\.(com|org)|sxsy\.org)/', url):
+                return super().request(method, url, **kwargs)
+
             payload = {
                 'url': url,
                 'method': method,
@@ -31,9 +34,9 @@ def patch_requests():
             if 'data' in kwargs:
                 payload['body'] = kwargs['data']
 
-            r = _req.post(self._proxy_url, json=payload,
-                          headers={'X-Proxy-Token': pt, 'Content-Type': 'application/json'},
-                          timeout=60)
+            r = _orig_post(self._proxy_url, json=payload,
+                           headers={'X-Proxy-Token': pt, 'Content-Type': 'application/json'},
+                           timeout=60)
             result = r.json()
 
             for c in result.get('setCookie', []):
@@ -53,11 +56,18 @@ def patch_requests():
 
             return _Resp(result['status'], result['body'], result.get('headers', {}))
 
+    def _check_domain(url):
+        return bool(re.match(r'https?://(sxsy\d+\.(com|org)|sxsy\.org)/', url))
+
     def _proxy_get(url, **kw):
-        return ProxySession().get(url, **kw)
+        if _check_domain(url):
+            return ProxySession().get(url, **kw)
+        return _orig_get(url, **kw)
 
     def _proxy_post(url, **kw):
-        return ProxySession().post(url, **kw)
+        if _check_domain(url):
+            return ProxySession().post(url, **kw)
+        return _orig_post(url, **kw)
 
     _req.Session = ProxySession
     _req.get = _proxy_get
