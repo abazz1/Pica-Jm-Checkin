@@ -1,7 +1,10 @@
 import os
-import re
 import json
 import requests as _req
+
+
+def _is_sxsy(url):
+    return url.startswith('https://sxsy') and ('.com/' in url or '.org/' in url)
 
 
 def patch_requests():
@@ -20,7 +23,7 @@ def patch_requests():
             self._proxy_url = pu
 
         def request(self, method, url, **kwargs):
-            if not re.match(r'https?://(sxsy\d+\.(com|org)|sxsy\.org)/', url):
+            if not _is_sxsy(url):
                 return super().request(method, url, **kwargs)
 
             payload = {
@@ -56,16 +59,13 @@ def patch_requests():
 
             return _Resp(result['status'], result['body'], result.get('headers', {}))
 
-    def _check_domain(url):
-        return bool(re.match(r'https?://(sxsy\d+\.(com|org)|sxsy\.org)/', url))
-
     def _proxy_get(url, **kw):
-        if _check_domain(url):
+        if _is_sxsy(url):
             return ProxySession().get(url, **kw)
         return _orig_get(url, **kw)
 
     def _proxy_post(url, **kw):
-        if _check_domain(url):
+        if _is_sxsy(url):
             return ProxySession().post(url, **kw)
         return _orig_post(url, **kw)
 
