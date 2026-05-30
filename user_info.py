@@ -1,4 +1,4 @@
-import os, sys, hashlib, hmac, json, uuid, base64, time, requests
+import os, sys, hashlib, hmac, json, uuid, base64, time, random, requests
 from Crypto.Cipher import AES
 from urllib.parse import urlencode
 
@@ -163,6 +163,110 @@ def get_pica_info():
         return None
 
 
+def get_sxsy_info():
+    sxsy_env = os.environ.get("SXSY", "")
+    if not sxsy_env:
+        return None
+
+    import requests as req
+    host = "sxsy13.com"
+    try:
+        r = req.get('https://sxsy.org/site.jpg', timeout=10)
+        import ddddocr
+        text = ddddocr.DdddOcr(show_ad=False).classification(r.content).lower().replace(' ', '')
+        import re
+        m = re.search(r'(sxsy\d+\.?com)', text)
+        if m:
+            h = m.group(1).replace('。', '.').replace('，', '.')
+            if '.' not in h:
+                h = h.replace('com', '.com')
+            host = h
+    except:
+        pass
+
+    accounts = []
+    for line in sxsy_env.strip().split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        if '&' in line:
+            accounts.append(line.split('&', 1))
+        else:
+            accounts.append((line, None))
+
+    lines = []
+    for idx, (user, pwd) in enumerate(accounts, 1):
+        session = req.Session()
+        session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+        session.get(f"https://{host}/", timeout=10)
+
+        cookie_file = 'sxsy_checkin_cookie.json'
+        cookies_ok = False
+        if os.path.exists(cookie_file):
+            try:
+                with open(cookie_file) as f:
+                    data = json.load(f)
+                if user in data.get('accounts', {}):
+                    for item in data['accounts'][user]['cookies'].split(';'):
+                        if '=' in item:
+                            k, v = item.split('=', 1)
+                            session.cookies.set(k.strip(), v.strip())
+                    r = session.get(f"https://{host}/home.php?mod=space", timeout=10)
+                    if '请先登录' not in r.text:
+                        cookies_ok = True
+            except:
+                pass
+
+        if not cookies_ok and pwd:
+            try:
+                r = session.get(f"https://{host}/member.php?mod=logging&action=login&infloat=yes&frommessage&inajax=1&ajaxtarget=messagelogin", timeout=10)
+                formhash = re.search(r'formhash" value="([^"]+)"', r.text)
+                seccodehash = re.search(r'seccode_([a-zA-Z0-9]{6})', r.text)
+                loginhash = re.search(r'main_messaqge_([a-zA-Z0-9]{5})', r.text)
+                if not all([formhash, seccodehash, loginhash]):
+                    lines.append(f"  👤 SXSY 账号{idx}: ❌ 获取参数失败")
+                    continue
+
+                ocr = ddddocr.DdddOcr(show_ad=False)
+                for _ in range(5):
+                    cu = f"https://{host}/misc.php?mod=seccode&update={random.randint(10000,99999)}&idhash={seccodehash.group(1)}"
+                    r2 = session.get(cu, headers={'Referer': f'https://{host}/member.php?mod=logging&action=login'}, timeout=10)
+                    cap = ocr.classification(r2.content)
+                    vu = f"https://{host}/misc.php?mod=seccode&action=check&inajax=1&modid=member::logging&idhash={seccodehash.group(1)}&secverify={cap}"
+                    r3 = session.get(vu, headers={'Referer': f'https://{host}/member.php?mod=logging&action=login'}, timeout=10)
+                    if 'succeed' in r3.text:
+                        break
+                else:
+                    lines.append(f"  👤 SXSY 账号{idx}: ❌ 验证码失败")
+                    continue
+
+                import urllib.parse
+                loginfield = 'email' if '@' in user else 'username'
+                payload = f"formhash={formhash.group(1)}&referer=https://{host}/&loginfield={loginfield}&username={user}&password={pwd}&questionid=0&answer=&seccodehash={seccodehash.group(1)}&seccodemodid=member::logging&seccodeverify={cap}&cookietime=2592000"
+                lurl = f"https://{host}/member.php?mod=logging&action=login&loginsubmit=yes&loginhash={loginhash.group(1)}&inajax=1"
+                r = session.post(lurl, headers={'Referer': f'https://{host}/', 'content-type': 'application/x-www-form-urlencoded'}, data=urllib.parse.quote(payload, safe='=&'), timeout=10)
+                if '欢迎您回来' not in r.text:
+                    lines.append(f"  👤 SXSY 账号{idx}: ❌ 登录失败")
+                    continue
+            except Exception as e:
+                lines.append(f"  👤 SXSY 账号{idx}: ❌ {e}")
+                continue
+
+        try:
+            r = session.get(f"https://{host}/home.php?mod=spacecp&ac=credit&showcredit=1", timeout=10)
+            m_money = re.search(r'金钱: </em>(\d+)', r.text)
+            m_uid = re.search(r'uid=(\d+)', r.text)
+            uid = m_uid.group(1) if m_uid else '?'
+            name = re.search(r'欢迎您回来[，,]?\s*([^，,<]+)', r.text)
+            display_name = name.group(1).strip() if name else f"账号{idx}"
+            money = m_money.group(1) if m_money else '?'
+            lines.append(f"  👤 SXSY {display_name} (UID {uid})  💰 {money} 金钱")
+        except Exception as e:
+            lines.append(f"  👤 SXSY 账号{idx}: ❌ 获取信息失败")
+
+    return '\n'.join(lines) if lines else None
+
+
 def pica_exp_progress(level, exp):
     n = int(level)
     e = int(exp)
@@ -214,6 +318,14 @@ if __name__ == "__main__":
         )
     else:
         lines.append("<b>🐱 Picacg</b> ❌ 未配置或登录失败")
+
+    lines.append("")
+
+    sxsy = get_sxsy_info()
+    if sxsy:
+        lines.append(f"<b>📚 尚香书苑</b>\n{sxsy}")
+    else:
+        lines.append("<b>📚 尚香书苑</b> ❌ 未配置或登录失败")
 
     msg = "\n".join(lines)
     print(msg)
