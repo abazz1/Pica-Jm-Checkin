@@ -91,13 +91,15 @@ def get_jm_info():
             info = json.loads(dec[s:e+1])
 
             next_exp = int(info.get("nextLevelExp", 0))
-            exp_pct = min(round(int(info.get("exp", 0)) / next_exp * 100), 100) if next_exp > 0 else 100
+            exp_val = int(info.get("exp", 0))
+            exp_pct = min(round(exp_val / next_exp * 100), 100) if next_exp > 0 else 100
             return {
                 "uid": info.get("uid", "?"),
                 "name": info.get("username", "?"),
                 "level": info.get("level", 1),
                 "level_name": info.get("level_name", ""),
                 "coin": info.get("coin", 0),
+                "exp": exp_val,
                 "exp_pct": exp_pct,
                 "favorites": f"{info.get('album_favorites', 0)}/{info.get('album_favorites_max', 0)}",
             }
@@ -174,6 +176,7 @@ if __name__ == "__main__":
             f"<b>📖 JM Comic</b>\n"
             f"  👤 {jm['name']} (UID {jm['uid']})\n"
             f"  ⭐ Lv.{jm['level']} ({jm['level_name']})\n"
+            f"  ✨ {jm['exp']} 经验\n"
             f"  💰 {jm['coin']} 金币\n"
             f"  ❤️ 收藏 {jm['favorites']}\n"
             f"  📈 |{bar}| {pct}%"
@@ -185,16 +188,13 @@ if __name__ == "__main__":
 
     pica = get_pica_info()
     if pica:
-        pct = pica.get("exp_pct", 0)
-        bar = "█" * (pct // 10) + "░" * (10 - pct // 10)
         punched = "✅" if pica["isPunched"] else "❌"
         lines.append(
             f"<b>🐱 Picacg</b>\n"
             f"  👤 {pica['name']} ({pica['email']})\n"
             f"  ⭐ Lv.{pica['level']} ({pica['title']})\n"
             f"  ✨ {pica['exp']} 经验\n"
-            f"  📌 今日签到: {punched}\n"
-            f"  📈 |{bar}| {pct}%"
+            f"  📌 今日签到: {punched}"
         )
     else:
         lines.append("<b>🐱 Picacg</b> ❌ 未配置或登录失败")
